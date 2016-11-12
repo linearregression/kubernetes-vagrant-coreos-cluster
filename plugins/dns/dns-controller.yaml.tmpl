@@ -22,7 +22,7 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 50Mi
+            memory: 20Mi
         command:
         - /usr/local/bin/etcd
         - -data-dir
@@ -41,7 +41,7 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 50Mi
+            memory: 20Mi
         args:
         # command = "/kube2sky"
         - -domain=__DNS_DOMAIN__
@@ -50,7 +50,7 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 50Mi
+            memory: 20Mi
         args:
         # command = "/skydns"
         - -machines=http://localhost:2379
@@ -83,7 +83,7 @@ spec:
         resources:
           limits:
             cpu: 10m
-            memory: 20Mi
+            memory: 10Mi
         args:
         - -cmd=nslookup kubernetes.default.svc.__DNS_DOMAIN__ localhost >/dev/null
         - -port=8080
