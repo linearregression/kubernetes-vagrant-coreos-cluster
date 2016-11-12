@@ -68,7 +68,7 @@ DOCKERCFG = File.expand_path(ENV['DOCKERCFG'] || "~/.dockercfg")
 
 DOCKER_OPTIONS = ENV['DOCKER_OPTIONS'] || ''
 
-KUBERNETES_VERSION = ENV['KUBERNETES_VERSION'] || '1.3.0'
+KUBERNETES_VERSION = ENV['KUBERNETES_VERSION'] || '1.4.4'
 
 CHANNEL = ENV['CHANNEL'] || 'alpha'
 #if CHANNEL != 'alpha'
@@ -128,7 +128,7 @@ Object.redefine_const(:CLOUD_PROVIDER,
 MOUNT_POINTS = YAML::load_file('synced_folders.yaml')
 
 REQUIRED_BINARIES_FOR_MASTER = ['kube-apiserver', 'kube-controller-manager', 'kube-scheduler']
-REQUIRED_BINARIES_FOR_NODES = ['kube-proxy', 'kubelet']
+REQUIRED_BINARIES_FOR_NODES = ['kube-proxy']
 REQUIRED_BINARIES = REQUIRED_BINARIES_FOR_MASTER + REQUIRED_BINARIES_FOR_NODES
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
@@ -279,7 +279,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
               urlDomain = "storage.googleapis.com"
               urlResource = "/kubernetes-release/release/v#{KUBERNETES_VERSION}/bin/linux/amd64/#{filename}"
               info "Trying to download #{urlDomain}#{urlResource}..."
-              Net::HTTP.start(urlDomain) do |http|
+              Net::HTTP.new(urlDomain).start do |http|
                   resp = http.get(urlResource)
                   open(file, "wb") do |f|
                     f.write(resp.body)
@@ -360,10 +360,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
           end
           if not res.is_a? Net::HTTPSuccess
             if OS.windows?
-              run_remote "/opt/bin/kubectl create -f /home/core/kube-system.yaml"
               run_remote "/opt/bin/kubectl create -f /home/core/dns-controller.yaml"
             else
-              system "kubectl create -f kube-system.yaml"
               system "kubectl create -f temp/dns-controller.yaml"
             end
           end
@@ -383,18 +381,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
           if USE_KUBE_UI
             info "Configuring Kubernetes dashboard..."
-            res, uri.path = nil, '/api/v1/namespaces/kube-system'
-            begin
-              res = Net::HTTP.get_response(uri)
-            rescue
-            end
-            if not res.is_a? Net::HTTPSuccess
-              if OS.windows?
-                run_remote "/opt/bin/kubectl create -f /home/core/kube-system.yaml"
-              else
-                system "kubectl create -f kube-system.yaml"
-              end
-            end
 
             res, uri.path = nil, '/api/v1/namespaces/kube-system/replicationcontrollers/kubernetes-dashboard'
             begin
@@ -432,7 +418,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
           kHost.vm.provision :file, :source => File.join(File.dirname(__FILE__), "temp/setup"), :destination => "/home/core/kubectlsetup"
           kHost.vm.provision :file, :source => File.join(File.dirname(__FILE__), "temp/dns-controller.yaml"), :destination => "/home/core/dns-controller.yaml"
           kHost.vm.provision :file, :source => File.join(File.dirname(__FILE__), "plugins/dns/dns-service.yaml"), :destination => "/home/core/dns-service.yaml"
-          kHost.vm.provision :file, :source => File.join(File.dirname(__FILE__), "kube-system.yaml"), :destination => "/home/core/kube-system.yaml"
 
           if USE_KUBE_UI
             kHost.vm.provision :file, :source => File.join(File.dirname(__FILE__), "plugins/dashboard/dashboard-controller.yaml"), :destination => "/home/core/dashboard-controller.yaml"
@@ -553,17 +538,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
           end
         end
       rescue
-      end
-
-      # copying Kubernetes binaries to VM
-      (vmName == 'master' ? REQUIRED_BINARIES_FOR_MASTER : REQUIRED_BINARIES_FOR_NODES).each do |filename|
-        file="#{binaries_host_dir}/#{filename}"
-        kHost.vm.provision :shell, :privileged => true, inline: <<-EOF
-          echo "Copying host:#{file} to vm:/opt/bin/#{filename}.."
-          mkdir -p /opt/bin
-          cp "/vagrant/#{binaries_host_dir}/#{filename}" "/opt/bin/#{filename}"
-          chmod +x "/opt/bin/#{filename}"
-        EOF
       end
 
       if USE_DOCKERCFG && File.exist?(DOCKERCFG)
